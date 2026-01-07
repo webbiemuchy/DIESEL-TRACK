@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DIESEL-TRACK | Heavy Equipment Management</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="brand">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--cat-yellow)">
+        <path d="M19,8H17V6a1,1,0,0,0-1-1H4A1,1,0,0,0,3,6V18a1,1,0,0,0,1,1H17a1,1,0,0,0,1-1V16h1a1,1,0,0,1,1,1v1a1,1,0,0,0,2,0V17A3,3,0,0,0,19,14V10A2,2,0,0,0,19,8ZM16,17H5V7H16ZM11,9h2v4H11Zm0,5h2v1H11Z"/>
+      </svg>
+      <h1>Diesel-Track</h1>
+    </div>
+    <div class="header-actions">
+      <button id="btn-export">Export Data</button>
+      <button id="btn-import-trigger">Import</button>
+      <input type="file" id="file-import" style="display:none" accept=".json">
+      <button id="btn-reset" class="danger">Reset System</button>
+      <div id="status-indicator" class="status-msg">SYSTEM READY</div>
+    </div>
+  </header>
+
+  <nav class="nav-strip">
+    <button class="tab active" data-tab="refuels">Fuel Logs</button>
+    <button class="tab" data-tab="machines">Fleet</button>
+    <button class="tab" data-tab="operators">Staff</button>
+    <button class="tab" data-tab="reports">Analytics</button>
+    <button class="tab" data-tab="settings">Config</button>
+  </nav>
+
+  <main>
+    <!-- SECTION: REFUELS -->
+    <section id="tab-refuels" class="tab-content active">
+      <div class="card">
+        <h2>New Refuel Entry</h2>
+        <form id="form-refuel" class="grid-form">
+          <input type="hidden" id="refuel-id" />
+          <div class="form-group">
+            <label>Date</label>
+            <input id="refuel-date" type="date" required />
+          </div>
+          <div class="form-group">
+            <label>Machine</label>
+            <select id="refuel-machine" required><option value="">Select Asset...</option></select>
+          </div>
+          <div class="form-group">
+            <label>Operator</label>
+            <select id="refuel-operator" required><option value="">Select Driver...</option></select>
+          </div>
+          <div class="form-group">
+            <label>Usage (Hrs/Km/Loads)</label>
+            <input id="refuel-usage" type="number" step="0.1" required />
+          </div>
+          <div class="form-group">
+            <label>Fuel Added (Litres)</label>
+            <input id="refuel-fuel" type="number" step="0.1" required />
+          </div>
+          <div class="form-actions-inline">
+            <button type="submit" class="primary">Record Entry</button>
+            <button type="button" id="refuel-cancel">Clear</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="table-container">
+        <table id="table-refuels">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Asset</th>
+              <th>Operator</th>
+              <th>Usage</th>
+              <th>Litres</th>
+              <th>Expected</th>
+              <th>Variance</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION: MACHINES -->
+    <section id="tab-machines" class="tab-content">
+      <div class="card">
+        <h2>Asset Inventory</h2>
+        <form id="form-machine" class="grid-form">
+          <input type="hidden" id="machine-id" />
+          <div class="form-group">
+            <label>Asset Name</label>
+            <input id="machine-name" required placeholder="e.g. CAT D10 Dozer" />
+          </div>
+          <div class="form-group">
+            <label>Metric Type</label>
+            <select id="machine-usage-type">
+              <option value="hours">Hours (L/Hr)</option>
+              <option value="distance">Distance (L/Km)</option>
+              <option value="loads">Production (L/Load)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Target Consumption Rate</label>
+            <input id="machine-rate-a" type="number" step="0.1" required placeholder="Standard L per Unit" />
+          </div>
+          <div class="form-group flex-end">
+            <button type="submit" class="primary">Save Asset</button>
+          </div>
+        </form>
+      </div>
+      <div class="table-container">
+        <table id="table-machines">
+          <thead>
+            <tr>
+              <th>Asset Name</th>
+              <th>Type</th>
+              <th>Rate</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION: OPERATORS -->
+    <section id="tab-operators" class="tab-content">
+      <div class="card">
+        <h2>Staff Records</h2>
+        <form id="form-operator" class="grid-form">
+          <input type="hidden" id="operator-id" />
+          <div class="form-group">
+            <label>Full Name</label>
+            <input id="operator-name" required />
+          </div>
+          <div class="form-group">
+            <label>Badge Number</label>
+            <input id="operator-badge" />
+          </div>
+          <div class="form-group flex-end">
+            <button type="submit" class="primary">Add Staff</button>
+          </div>
+        </form>
+      </div>
+      <div class="table-container">
+        <table id="table-operators">
+          <thead>
+            <tr>
+              <th>Operator</th>
+              <th>Badge</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION: REPORTS -->
+    <section id="tab-reports" class="tab-content">
+      <div class="report-header">
+        <div class="form-group">
+          <label>Date From</label>
+          <input type="date" id="report-from">
+        </div>
+        <div class="form-group">
+          <label>Date To</label>
+          <input type="date" id="report-to">
+        </div>
+        <div class="form-group">
+          <label>Filter Asset</label>
+          <select id="report-machine"><option value="">All Assets</option></select>
+        </div>
+        <button id="btn-refresh-report" class="primary">Generate</button>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-item">
+          <span>Total Fuel Dispensed</span>
+          <strong id="sum-fuel">0 L</strong>
+        </div>
+        <div class="stat-item">
+          <span>Total Expected</span>
+          <strong id="sum-expected">0 L</strong>
+        </div>
+        <div class="stat-item">
+          <span>Variance Flag Count</span>
+          <strong id="sum-anomalies" class="danger-text">0</strong>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="card">
+          <h3>Fuel Trends</h3>
+          <canvas id="chart-fuel-time" height="200"></canvas>
+        </div>
+        <div class="card">
+          <h3>Consumption Variance</h3>
+          <canvas id="chart-variance" height="200"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: SETTINGS -->
+    <section id="tab-settings" class="tab-content">
+      <div class="card max-w-600">
+        <h2>System Configuration</h2>
+        <form id="form-settings" class="grid-form vertical">
+          <div class="form-group">
+            <label>Variance Tolerance (%)</label>
+            <input id="set-tolerance" type="number" step="0.5" value="10" />
+            <small class="muted">Flags entries exceeding this percentage difference from expected rate.</small>
+          </div>
+          <div class="form-group">
+            <label>Decimal Precision</label>
+            <input id="set-decimals" type="number" value="2" min="0" max="4" />
+          </div>
+          <button type="submit" class="primary mt-1">Save Configuration</button>
+        </form>
+        <p class="muted">Local storage is used. No data is sent to external servers.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let state = {
+      machines: [],
+      operators: [],
+      refuels: [],
+      settings: { tolerance: 10, decimals: 2 }
+    };
+
+    const DB_NAME = "DieselTrackDB";
+    const DB_VERSION = 1;
+
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains("state")) db.createObjectStore("state");
+        };
+        request.onsuccess = (e) => resolve(e.target.result);
+        request.onerror = (e) => reject(e);
+      });
+    }
+
+    async function saveState() {
+      const db = await initDB();
+      const tx = db.transaction("state", "readwrite");
+      tx.objectStore("state").put(state, "current");
+      updateUI();
+    }
+
+    async function loadState() {
+      const db = await initDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction("state", "readonly");
+        const request = tx.objectStore("state").get("current");
+        request.onsuccess = () => {
+          if (request.result) state = request.result;
+          resolve();
+        };
+      });
+    }
+
+    function calculateVariance(entry) {
+      const machine = state.machines.find(m => m.id === entry.machineId);
+      if (!machine) return { expected: 0, diff: 0, percent: 0, isAnomaly: false };
+      const expected = entry.usage * machine.rateA;
+      const diff = entry.fuel - expected;
+      const percent = expected === 0 ? 0 : (Math.abs(diff) / expected) * 100;
+      const isAnomaly = percent > state.settings.tolerance;
+      return { 
+        expected: expected.toFixed(state.settings.decimals), 
+        diff: diff.toFixed(state.settings.decimals), 
+        percent: percent.toFixed(1),
+        isAnomaly 
+      };
+    }
+
+    function updateUI() {
+      renderTables();
+      renderDropdowns();
+      renderCharts();
+    }
+
+    function renderDropdowns() {
+      const mSelect = document.getElementById('refuel-machine');
+      const oSelect = document.getElementById('refuel-operator');
+      const rSelect = document.getElementById('report-machine');
+      const mOptions = state.machines.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+      const oOptions = state.operators.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+      mSelect.innerHTML = `<option value="">Select Asset...</option>` + mOptions;
+      oSelect.innerHTML = `<option value="">Select Driver...</option>` + oOptions;
+      rSelect.innerHTML = `<option value="">All Assets</option>` + mOptions;
+    }
+
+    function renderTables() {
+      const refuelBody = document.querySelector('#table-refuels tbody');
+      refuelBody.innerHTML = state.refuels.map(r => {
+        const m = state.machines.find(mach => mach.id === r.machineId);
+        const o = state.operators.find(oper => oper.id === r.operatorId);
+        const stats = calculateVariance(r);
+        return `
+          <tr>
+            <td>${r.date}</td>
+            <td>${m?.name || 'Deleted'}</td>
+            <td>${o?.name || 'Deleted'}</td>
+            <td>${r.usage}</td>
+            <td>${r.fuel}L</td>
+            <td>${stats.expected}L</td>
+            <td>${stats.diff}L</td>
+            <td><span class="badge ${stats.isAnomaly ? 'badge-warn' : 'badge-ok'}">${stats.isAnomaly ? 'VARIANCE' : 'OPTIMAL'}</span></td>
+            <td><button onclick="deleteRefuel('${r.id}')" class="danger">Delete</button></td>
+          </tr>
+        `;
+      }).join('');
+
+      const machineBody = document.querySelector('#table-machines tbody');
+      machineBody.innerHTML = state.machines.map(m => `
+        <tr>
+          <td><strong>${m.name}</strong></td>
+          <td>${m.usageType}</td>
+          <td>${m.rateA} L/${m.usageType.slice(0,-1)}</td>
+          <td><button onclick="deleteMachine('${m.id}')" class="danger">Delete</button></td>
+        </tr>
+      `).join('');
+
+      const operatorBody = document.querySelector('#table-operators tbody');
+      operatorBody.innerHTML = state.operators.map(o => `
+        <tr>
+          <td>${o.name}</td>
+          <td>${o.badge || 'N/A'}</td>
+          <td><button onclick="deleteOperator('${o.id}')" class="danger">Delete</button></td>
+        </tr>
+      `).join('');
+    }
+
+    let fuelChart, varChart;
+    function renderCharts() {
+      const fuelCtx = document.getElementById('chart-fuel-time')?.getContext('2d');
+      const varCtx = document.getElementById('chart-variance')?.getContext('2d');
+      if (!fuelCtx) return;
+      if (fuelChart) fuelChart.destroy();
+      if (varChart) varChart.destroy();
+      const sorted = [...state.refuels].sort((a,b) => new Date(a.date) - new Date(b.date));
+      const labels = sorted.map(r => r.date);
+      fuelChart = new Chart(fuelCtx, {
+        type: 'line',
+        data: { labels, datasets: [{ label: 'Fuel (L)', data: sorted.map(r => r.fuel), borderColor: '#FFB400', tension: 0.1 }] },
+        options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#333' } } } }
+      });
+      varChart = new Chart(varCtx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Anomaly', data: sorted.map(r => calculateVariance(r).isAnomaly ? 1 : 0), backgroundColor: '#FF5722' }] },
+        options: { plugins: { legend: { display: false } } }
+      });
+      const totalFuel = state.refuels.reduce((acc, r) => acc + Number(r.fuel), 0);
+      const totalExpected = state.refuels.reduce((acc, r) => acc + Number(calculateVariance(r).expected), 0);
+      const totalAnomalies = state.refuels.filter(r => calculateVariance(r).isAnomaly).length;
+      document.getElementById('sum-fuel').innerText = `${totalFuel.toFixed(1)} L`;
+      document.getElementById('sum-expected').innerText = `${totalExpected.toFixed(1)} L`;
+      document.getElementById('sum-anomalies').innerText = totalAnomalies;
+    }
+
+    function deleteMachine(id) { state.machines = state.machines.filter(m => m.id !== id); saveState(); }
+    function deleteOperator(id) { state.operators = state.operators.filter(o => o.id !== id); saveState(); }
+    function deleteRefuel(id) { state.refuels = state.refuels.filter(r => r.id !== id); saveState(); }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadState();
+      updateUI();
+      document.querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+          if (btn.dataset.tab === 'reports') renderCharts();
+        });
+      });
+      document.getElementById('form-machine').addEventListener('submit', (e) => {
+        e.preventDefault();
+        state.machines.push({ id: Date.now().toString(), name: document.getElementById('machine-name').value, usageType: document.getElementById('machine-usage-type').value, rateA: parseFloat(document.getElementById('machine-rate-a').value) });
+        e.target.reset(); saveState();
+      });
+      document.getElementById('form-operator').addEventListener('submit', (e) => {
+        e.preventDefault();
+        state.operators.push({ id: Date.now().toString(), name: document.getElementById('operator-name').value, badge: document.getElementById('operator-badge').value });
+        e.target.reset(); saveState();
+      });
+      document.getElementById('form-refuel').addEventListener('submit', (e) => {
+        e.preventDefault();
+        state.refuels.push({ id: Date.now().toString(), date: document.getElementById('refuel-date').value, machineId: document.getElementById('refuel-machine').value, operatorId: document.getElementById('refuel-operator').value, usage: parseFloat(document.getElementById('refuel-usage').value), fuel: parseFloat(document.getElementById('refuel-fuel').value) });
+        saveState(); e.target.reset();
+      });
+      document.getElementById('btn-export').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diesel-track-data.json'; a.click();
+      });
+      document.getElementById('btn-import-trigger').addEventListener('click', () => document.getElementById('file-import').click());
+      document.getElementById('file-import').addEventListener('change', (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => { state = JSON.parse(ev.target.result); saveState(); };
+        reader.readAsText(file);
+      });
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        if(confirm('WIPE ALL DATA? This cannot be undone.')) {
+          state = { machines: [], operators: [], refuels: [], settings: { tolerance: 10, decimals: 2 } };
+          saveState();
+          location.reload();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
