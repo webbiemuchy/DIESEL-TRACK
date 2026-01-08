@@ -49,7 +49,13 @@
       </div>
 
       <div class="card mt-1">
-        <h2>Activity History</h2>
+        <div class="table-header">
+          <h2>Activity History</h2>
+          <div class="view-controls">
+            <button id="btn-view-today" class="btn btn-sm btn-primary active">Today</button>
+            <button id="btn-view-all" class="btn btn-sm btn-secondary">All History</button>
+          </div>
+        </div>
         <div class="table-container">
           <table id="table-refuels">
             <thead>
@@ -59,6 +65,7 @@
                 <th>Operator</th>
                 <th>Usage</th>
                 <th>Fuel</th>
+                <th>Expected</th>
                 <th>Variance</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -115,16 +122,42 @@
     </section>
 
     <section id="view-analytics" class="tab-content">
+      <!-- Date Range Filter -->
+      <div class="card">
+        <div class="analytics-header">
+          <h2>Analytics Dashboard</h2>
+          <div class="date-filter">
+            <label>Date Range:</label>
+            <input type="date" id="date-from" class="date-input">
+            <span>to</span>
+            <input type="date" id="date-to" class="date-input">
+            <button id="btn-apply-dates" class="btn btn-sm btn-primary">Apply</button>
+            <button id="btn-reset-dates" class="btn btn-sm btn-secondary">Reset</button>
+          </div>
+        </div>
+      </div>
+
       <div class="analytics-grid">
-        <!-- Linking Graph (Overall) -->
+        <!-- Expected vs Delivered Fuel -->
+        <div class="card">
+          <div class="chart-header">
+            <h2>Expected vs Delivered Fuel</h2>
+            <select id="chart-filter-expected">
+              <option value="">All Machines</option>
+            </select>
+          </div>
+          <div style="height: 300px;"><canvas id="chart-expected"></canvas></div>
+        </div>
+
+        <!-- Overall Fleet Trend -->
         <div class="card">
           <div class="chart-header">
             <h2>Overall Fleet Trend</h2>
           </div>
-          <div style="height: 300px;"><canvas id="chart-linking"></canvas></div>
+          <div style="height: 300px;"><canvas id="chart-fleet"></canvas></div>
         </div>
 
-        <!-- Machine Specific Graph -->
+        <!-- Individual Machine Analysis -->
         <div class="card">
           <div class="chart-header">
             <h2>Machine Performance</h2>
@@ -135,7 +168,7 @@
           <div style="height: 300px;"><canvas id="chart-machine"></canvas></div>
         </div>
 
-        <!-- Operator Specific Graph -->
+        <!-- Individual Operator Analysis -->
         <div class="card">
           <div class="chart-header">
             <h2>Operator Performance</h2>
@@ -144,6 +177,29 @@
             </select>
           </div>
           <div style="height: 300px;"><canvas id="chart-operator"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Stats Summary -->
+      <div class="card mt-1">
+        <h2>Period Summary</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <label>Total Fuel Consumed</label>
+            <span id="stat-total-fuel" class="stat-value">0 L</span>
+          </div>
+          <div class="stat-card">
+            <label>Total Machine Hours</label>
+            <span id="stat-total-hours" class="stat-value">0 hrs</span>
+          </div>
+          <div class="stat-card">
+            <label>Average Efficiency</label>
+            <span id="stat-avg-efficiency" class="stat-value">0%</span>
+          </div>
+          <div class="stat-card">
+            <label>Anomalies Detected</label>
+            <span id="stat-anomalies" class="stat-value">0</span>
+          </div>
         </div>
       </div>
     </section>
@@ -203,7 +259,7 @@
           </div>
           <div class="info-item">
             <label>Database Version:</label>
-            <span>v4</span>
+            <span>v5</span>
           </div>
         </div>
       </div>
