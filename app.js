@@ -402,26 +402,204 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 
                 let imported = { machines: 0, operators: 0, refuels: 0 };
+                let warnings = [];
                 
-                // Import machines
-                if (workbook.SheetNames.includes('Machines')) {
-                    const sheet = XLSX.utils.sheet_to_json(workbook.Sheets['Machines']);
-                    for (const row of sheet) {
-                        if (row.id && row.model && row.rate && row.capacity) {
-                            await dbPut(STORES.machines, row);
-                            imported.machines++;
+                // Helper function to normalize column names
+                const normalizeKey = (key) => {
+                    if (!key) return '';
+                    return key.toString().toLowerCase().trim().replace(/\s+/g, '');
+                };
+                
+                // Helper to find value by multiple possible column names
+                const findValue = (row, possibleNames) => {
+                    for (const name of possibleNames) {
+                        const normalized = normalizeKey(name);
+                        for (const key in row) {
+                            if (normalizeKey(key) === normalized) {
+                                const val = row[key];
+                                return (val !== null && val !== undefined && val !== '') ? val : null;
+                            }
+                        }
+                    }
+                    return null;
+                };
+                
+                console.log('Starting import process...');
+                console.log('Available sheets:', workbook.SheetNames);
+                
+                // PHASE 1: Import Machines first
+                for (const sheetName of workbook.SheetNames) {
+                    const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    if (sheet.length === 0) continue;
+                    
+                    const firstRow = sheet[0];
+                    const keys = Object.keys(firstRow).map(k => normalizeKey(k));
+                    
+                    console.log(`Sheet: ${sheetName}, Keys:`, keys);
+                    
+                    // Detect Machines/Assets
+                    const isMachineSheet = keys.some(k => k.includes('machine') || k === 'model' || k === 'rate' || k === 'capacity');
+                    
+                    if (isMachineSheet) {
+                        console.log(`Processing machines from sheet: ${sheetName}`);
+                        for (const row of sheet) {
+                            const machineId = findValue(row, ['Machine ID', 'Machine I', 'MachineID', 'Machine', 'ID', 'Asset ID', 'AssetID']);
+                            const model = findValue(row, ['Model', 'Machine Model', 'Type', 'Equipment Type']);
+                            const rate = findValue(row, ['Rate', 'Consumption Rate', 'Fuel Rate', 'L/hr', 'Liters/Hour']);
+                            const capacity = findValue(row, ['Capacity', 'Tank Capacity', 'Tank Size', 'Max Capacity']);
+                            
+                            console.log('Machine row:', { machineId, model, rate, capacity });
+                            
+                            if (machineId && model && rate && capacity) {
+                                const cleanId = machineId.toString().toUpperCase().trim();
+                                const cleanRate = parseFloat(rate);
+                                const cleanCapacity = parseFloat(capacity);
+                                
+                                if (!isNaN(cleanRate) && cleanRate > 0 && !isNaN(cleanCapacity) && cleanCapacity > 0) {
+                                    await dbPut(STORES.machines, { 
+                                        id: cleanId, 
+                                        model: model.toString().trim(), 
+                                        rate: cleanRate, 
+                                        capacity: cleanCapacity 
+                                    });
+                                    imported.machines++;
+                                    console.log(`Imported machine: ${cleanId}`);
+                                }
+                            }
                         }
                     }
                 }
                 
-                // Import operators
-                if (workbook.SheetNames.includes('Operators')) {
-                    const sheet = XLSX.utils.sheet_to_json(workbook.Sheets['Operators']);
-                    for (const row of sheet) {
-                        if (row.name && row.badge) {
-                            if (!row.id) row.id = uuid();
-                            await dbPut(STORES.operators, row);
-                            imported.operators++;
+                // Reload state after machines
+                await loadState();
+                console.log('Machines loaded:', state.machines.length);
+                
+                // PHASE 2: Import Operators
+                for (const sheetName of workbook.SheetNames) {
+                    const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    if (sheet.length === 0) continue;
+                    
+                    const firstRow = sheet[0];
+                    const keys = Object.keys(firstRow).map(k => normalizeKey(k));
+                    
+                    // Detect Operators - must have operator or badge, but NOT machine/model/rate
+                    const isOperatorSheet = (keys.includes('operator') || keys.includes('badge') || keys.includes('badgenumber')) &&
+                                           !keys.includes('machine') && !keys.includes('model') && !keys.includes('rate');
+                    
+                    if (isOperatorSheet) {
+                        console.log(`Processing operators from sheet: ${sheetName}`);
+                        for (const row of sheet) {
+                            const name = findValue(row, ['Operator', 'Name', 'Operator Name', 'Full Name', 'Employee Name']);
+                            const badge = findValue(row, ['Badge Number', 'Badge', 'BadgeNumber', 'ID', 'Employee ID', 'Badge ID']);
+                            
+                            console.log('Operator row:', { name, badge });
+                            
+                            if (name && badge) {
+                                const cleanName = name.toString().trim();
+                                const cleanBadge = badge.toString().trim();
+                                
+                                const existingOp = state.operators.find(o => 
+                                    o.badge === cleanBadge || 
+                                    o.name.toLowerCase() === cleanName.toLowerCase()
+                                );
+                                
+                                if (!existingOp) {
+                                    await dbPut(STORES.operators, { 
+                                        id: uuid(), 
+                                        name: cleanName, 
+                                        badge: cleanBadge 
+                                    });
+                                    imported.operators++;
+                                    console.log(`Imported operator: ${cleanName}`);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Reload state after operators
+                await loadState();
+                console.log('Operators loaded:', state.operators.length);
+                
+                // PHASE 3: Import Refueling logs
+                for (const sheetName of workbook.SheetNames) {
+                    const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    if (sheet.length === 0) continue;
+                    
+                    const firstRow = sheet[0];
+                    const keys = Object.keys(firstRow).map(k => normalizeKey(k));
+                    
+                    // Detect Refueling - must have fuel/fuelissued AND hours/usage AND machine AND operator
+                    const isRefuelSheet = (keys.some(k => k.includes('fuel')) || keys.includes('fuelissued')) &&
+                                         (keys.some(k => k.includes('hours')) || keys.includes('usage')) &&
+                                         keys.some(k => k.includes('machine')) &&
+                                         keys.some(k => k.includes('operator'));
+                    
+                    if (isRefuelSheet) {
+                        console.log(`Processing refueling from sheet: ${sheetName}`);
+                        for (const row of sheet) {
+                            const timestamp = findValue(row, ['Time', 'Timestamp', 'Date', 'DateTime', 'Date Time']);
+                            const machineId = findValue(row, ['Machine', 'Machine ID', 'MachineID', 'Asset', 'Equipment']);
+                            const operatorName = findValue(row, ['Operator', 'Operator Name', 'Name', 'Employee']);
+                            const usage = findValue(row, ['Hours worked', 'Hoursworked', 'Hours', 'Usage', 'Running Hours', 'Operating Hours']);
+                            const fuel = findValue(row, ['Fuel issued', 'Fuelissued', 'Fuel', 'Fuel Amount', 'Liters', 'Fuel Dispensed']);
+                            
+                            console.log('Refuel row:', { timestamp, machineId, operatorName, usage, fuel });
+                            
+                            if (machineId && operatorName && usage && fuel) {
+                                // Find machine
+                                const machine = state.machines.find(m => 
+                                    m.id === machineId.toString().toUpperCase().trim()
+                                );
+                                
+                                // Find operator
+                                const operator = state.operators.find(o => 
+                                    o.name.toLowerCase().trim() === operatorName.toString().toLowerCase().trim()
+                                );
+                                
+                                if (!machine) {
+                                    warnings.push(`Machine ${machineId} not found`);
+                                    continue;
+                                }
+                                
+                                if (!operator) {
+                                    warnings.push(`Operator "${operatorName}" not found`);
+                                    continue;
+                                }
+                                
+                                const parsedUsage = parseFloat(usage);
+                                const parsedFuel = parseFloat(fuel);
+                                
+                                if (!isNaN(parsedUsage) && parsedUsage > 0 && !isNaN(parsedFuel) && parsedFuel > 0) {
+                                    let ts = Date.now();
+                                    if (timestamp) {
+                                        try {
+                                            // Handle Excel date serial numbers
+                                            if (typeof timestamp === 'number') {
+                                                ts = (timestamp - 25569) * 86400 * 1000;
+                                            } else {
+                                                const parsedDate = new Date(timestamp);
+                                                if (!isNaN(parsedDate.getTime())) {
+                                                    ts = parsedDate.getTime();
+                                                }
+                                            }
+                                        } catch (err) {
+                                            console.warn('Date parsing failed:', err);
+                                        }
+                                    }
+                                    
+                                    await dbPut(STORES.refuels, {
+                                        id: uuid(),
+                                        timestamp: ts,
+                                        machineId: machine.id,
+                                        operatorId: operator.id,
+                                        usage: parsedUsage,
+                                        fuel: parsedFuel
+                                    });
+                                    imported.refuels++;
+                                    console.log(`Imported refuel: ${machine.id} / ${operator.name}`);
+                                }
+                            }
                         }
                     }
                 }
@@ -429,14 +607,28 @@
                 await loadState();
                 renderTables();
                 updateFilters();
-                showNotification(`Imported: ${imported.machines} machines, ${imported.operators} operators`, 'success');
+                
+                const messages = [];
+                if (imported.machines > 0) messages.push(`${imported.machines} machines`);
+                if (imported.operators > 0) messages.push(`${imported.operators} operators`);
+                if (imported.refuels > 0) messages.push(`${imported.refuels} refuel logs`);
+                
+                if (messages.length > 0) {
+                    showNotification(`Successfully imported: ${messages.join(', ')}`, 'success');
+                    if (warnings.length > 0) {
+                        console.warn('Import warnings:', warnings);
+                    }
+                } else {
+                    showNotification('No valid data found to import. Check console for details.', 'warning');
+                    console.log('Import completed with 0 records. Warnings:', warnings);
+                }
             } catch (e) {
                 showNotification('Import failed: ' + e.message, 'error');
+                console.error('Import error:', e);
             }
         };
         reader.readAsArrayBuffer(file);
     }
-
     // ========== BACKUP/RESTORE ==========
     async function backupToLocalStorage() {
         try {
